@@ -5,6 +5,7 @@ commands:
     group:
       isDefault: true
       kind: build
+    hotReloadCapable: false
     workingDir: ${PROJECT_SOURCE}
   id: build
 - exec:
@@ -13,8 +14,18 @@ commands:
     group:
       isDefault: true
       kind: run
+    hotReloadCapable: false
     workingDir: ${PROJECT_SOURCE}
   id: run
+- exec:
+    commandLine: mvn spring-boot:run -Dspring-boot.run.profiles=postgres
+    component: tools
+    group:
+      isDefault: false
+      kind: run
+    hotReloadCapable: false
+    workingDir: ${PROJECT_SOURCE}
+  id: my-run-with-postgres
 - exec:
     commandLine: java -Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=${DEBUG_PORT},suspend=n
       -jar target/*.jar
@@ -22,14 +33,28 @@ commands:
     group:
       isDefault: true
       kind: debug
+    hotReloadCapable: false
     workingDir: ${PROJECT_SOURCE}
   id: debug
+- exec:
+    commandLine: java -Dspring-boot.run.profiles=postgres -Xdebug -Xrunjdwp:server=y,transport=dt_socket,address=${DEBUG_PORT},suspend=n
+      -jar target/*.jar
+    component: tools
+    group:
+      isDefault: false
+      kind: debug
+    hotReloadCapable: false
+    workingDir: ${PROJECT_SOURCE}
+  id: my-debug-with-postgres
 components:
 - container:
+    dedicatedPod: false
     endpoints:
     - name: 8080-tcp
+      secure: false
       targetPort: 8080
     - name: debug
+      secure: false
       targetPort: 5858
     env:
     - name: DEBUG_PORT
@@ -43,20 +68,72 @@ components:
   name: tools
 - name: m2
   volume:
+    ephemeral: false
     size: 3Gi
+- kubernetes:
+    inlined: |
+      apiVersion: binding.operators.coreos.com/v1alpha1
+      kind: ServiceBinding
+      metadata:
+        creationTimestamp: null
+        name: my-java-springboot-app-shared-postgresql-ns-1
+      spec:
+        application:
+          group: apps
+          kind: Deployment
+          name: my-java-springboot-app-app
+          version: v1
+        bindAsFiles: true
+        detectBindingResources: true
+        services:
+        - group: postgresql.k8s.enterprisedb.io
+          id: my-java-springboot-app-shared-postgresql-ns-1
+          kind: Cluster
+          name: shared-postgresql-ns-1
+          namespace: shared-ns-1
+          resource: clusters
+          version: v1
+      status:
+        secret: ""
+  name: my-java-springboot-app-shared-postgresql-ns-1
+- kubernetes:
+    inlined: |
+      apiVersion: binding.operators.coreos.com/v1alpha1
+      kind: ServiceBinding
+      metadata:
+        creationTimestamp: null
+        name: my-java-springboot-app-cluster-sample
+      spec:
+        application:
+          group: apps
+          kind: Deployment
+          name: my-java-springboot-app-app
+          version: v1
+        bindAsFiles: false
+        detectBindingResources: true
+        services:
+        - group: postgresql.k8s.enterprisedb.io
+          id: my-java-springboot-app-cluster-sample
+          kind: Cluster
+          name: cluster-sample
+          resource: clusters
+          version: v1
+      status:
+        secret: ""
+  name: my-java-springboot-app-cluster-sample
 metadata:
   description: Spring Boot® using Java
   displayName: Spring Boot®
   globalMemoryLimit: 2674Mi
   icon: https://spring.io/images/projects/spring-edf462fec682b9d48cf628eaf9e19521.svg
   language: java
-  name: gs-spring-boot-complete
+  name: my-java-springboot-app
   projectType: spring
   tags:
   - Java
   - Spring
   version: 1.1.0
-schemaVersion: 2.0.0
+schemaVersion: 2.1.0
 starterProjects:
 - git:
     remotes:
